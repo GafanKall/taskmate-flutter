@@ -8,6 +8,10 @@ class CustomTextField extends StatelessWidget {
   final bool isObscured;
   final VoidCallback? onToggleVisibility;
   final TextEditingController? controller;
+  final String? Function(String?)? validator;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final bool enabled;
 
   const CustomTextField({
     super.key,
@@ -18,6 +22,10 @@ class CustomTextField extends StatelessWidget {
     this.isObscured = false,
     this.onToggleVisibility,
     this.controller,
+    this.validator,
+    this.keyboardType,
+    this.textInputAction,
+    this.enabled = true,
   });
 
   @override
@@ -32,10 +40,14 @@ class CustomTextField extends StatelessWidget {
           ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        TextField(
+        TextFormField(
           controller: controller,
           obscureText: isPassword && isObscured,
           style: Theme.of(context).textTheme.bodyLarge,
+          validator: validator,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          enabled: enabled,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon, color: Theme.of(context).hintColor),

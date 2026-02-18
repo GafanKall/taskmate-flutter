@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../widgets/shared/custom_text_field.dart';
 import '../widgets/shared/gradient_background.dart';
+import '../providers/auth_provider.dart';
 import '../main.dart'; // For themeNotifier
 
 class SignUpScreen extends StatefulWidget {
@@ -12,7 +14,34 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _isObscured = true;
+
+  void _signUp() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        await context.read<AuthProvider>().register(
+          _nameController.text,
+          _emailController.text,
+          _passwordController.text,
+          _confirmPasswordController.text,
+        );
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Registration failed: ${e.toString()}')),
+          );
+        }
+      }
+    }
+  }
 
   void _toggleTheme() {
     themeNotifier.value = themeNotifier.value == ThemeMode.light
@@ -22,6 +51,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+
     return Scaffold(
       body: Stack(
         children: [
@@ -108,136 +139,177 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ],
               ),
-              child: Column(
-                children: [
-                  Column(
-                    children: [
-                      Text(
-                        'Create Account',
-                        style: Theme.of(context).textTheme.displayMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Sign up to get started with TaskMate.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    Column(
+                      children: [
+                        Text(
+                          'Create Account',
+                          style: Theme.of(context).textTheme.displayMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Sign up to get started with TaskMate.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
 
-                  const SizedBox(height: 32),
+                    const SizedBox(height: 32),
 
-                  // Text Fields
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CustomTextField(
-                            label: 'Username',
-                            hint: 'yourname',
-                            icon: Icons.person_outline,
-                          ),
-                          const SizedBox(height: 16),
-                          CustomTextField(
-                            label: 'Email Address',
-                            hint: 'name@example.com',
-                            icon: Icons.mail_outlined,
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          Text(
-                            'Password',
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            obscureText: _isObscured,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                            decoration: InputDecoration(
-                              hintText: '••••••••',
-                              prefixIcon: Icon(
-                                Icons.lock_outlined,
-                                color: Theme.of(context).hintColor,
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isObscured
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: Theme.of(context).hintColor,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isObscured = !_isObscured;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: () {},
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'Sign Up',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.arrow_forward_rounded),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          Center(
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.pop(context);
+                    // Text Fields
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CustomTextField(
+                              label: 'Full Name',
+                              hint: 'Your Name',
+                              icon: Icons.person_outline,
+                              controller: _nameController,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your name';
+                                }
+                                return null;
                               },
-                              child: RichText(
-                                text: TextSpan(
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                  children: [
-                                    const TextSpan(
-                                      text: "Already have an account? ",
-                                    ),
-                                    TextSpan(
-                                      text: 'Sign In',
-                                      style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).primaryColor,
+                            ),
+                            const SizedBox(height: 16),
+                            CustomTextField(
+                              label: 'Email Address',
+                              hint: 'name@example.com',
+                              icon: Icons.mail_outlined,
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your email';
+                                }
+                                if (!value.contains('@')) {
+                                  return 'Please enter a valid email';
+                                }
+                                return null;
+                              },
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            CustomTextField(
+                              label: 'Password',
+                              hint: '••••••••',
+                              icon: Icons.lock_outlined,
+                              isPassword: true,
+                              isObscured: _isObscured,
+                              controller: _passwordController,
+                              onToggleVisibility: () {
+                                setState(() {
+                                  _isObscured = !_isObscured;
+                                });
+                              },
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter a password';
+                                }
+                                if (value.length < 8) {
+                                  return 'Password must be at least 8 characters';
+                                }
+                                return null;
+                              },
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            CustomTextField(
+                              label: 'Confirm Password',
+                              hint: '••••••••',
+                              icon: Icons.lock_clock_outlined,
+                              isPassword: true,
+                              isObscured: _isObscured,
+                              controller: _confirmPasswordController,
+                              validator: (value) {
+                                if (value != _passwordController.text) {
+                                  return 'Passwords do not match';
+                                }
+                                return null;
+                              },
+                            ),
+
+                            const SizedBox(height: 32),
+
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: authProvider.isLoading
+                                    ? null
+                                    : _signUp,
+                                child: authProvider.isLoading
+                                    ? const CircularProgressIndicator(
+                                        color: Colors.white,
+                                      )
+                                    : Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Sign Up',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Icon(
+                                            Icons.arrow_forward_rounded,
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            Center(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(context);
+                                },
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                    children: [
+                                      const TextSpan(
+                                        text: "Already have an account? ",
+                                      ),
+                                      TextSpan(
+                                        text: 'Sign In',
+                                        style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).primaryColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
 
-                          const SizedBox(height: 32),
-                        ],
+                            const SizedBox(height: 32),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

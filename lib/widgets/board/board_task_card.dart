@@ -9,6 +9,8 @@ class BoardTaskCard extends StatelessWidget {
   final List<String> memberAvatars;
   final bool hasAttachment;
   final bool isCompleted;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const BoardTaskCard({
     super.key,
@@ -20,6 +22,8 @@ class BoardTaskCard extends StatelessWidget {
     this.memberAvatars = const [],
     this.hasAttachment = false,
     this.isCompleted = false,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -88,10 +92,41 @@ class BoardTaskCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                Icon(
-                  Icons.more_horiz,
-                  color: Theme.of(context).hintColor.withOpacity(0.5),
-                  size: 20,
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_horiz,
+                    color: Theme.of(context).hintColor.withOpacity(0.5),
+                    size: 20,
+                  ),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      onEdit?.call();
+                    } else if (value == 'delete') {
+                      onDelete?.call();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

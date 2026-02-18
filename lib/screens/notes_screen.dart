@@ -1,12 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../widgets/notes/note_card.dart';
 import '../widgets/navigation/custom_bottom_nav_bar.dart';
+import '../providers/note_provider.dart';
 
-class NotesScreen extends StatelessWidget {
+class NotesScreen extends StatefulWidget {
   const NotesScreen({super.key});
 
   @override
+  State<NotesScreen> createState() => _NotesScreenState();
+}
+
+class _NotesScreenState extends State<NotesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NoteProvider>().fetchNotes();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final noteProvider = context.watch<NoteProvider>();
+
     return Scaffold(
       body: SafeArea(
         top: false,
@@ -15,6 +32,7 @@ class NotesScreen extends StatelessWidget {
             CustomScrollView(
               slivers: [
                 SliverAppBar(
+                  automaticallyImplyLeading: false,
                   pinned: true,
                   floating: true,
                   backgroundColor: Theme.of(
@@ -65,7 +83,7 @@ class NotesScreen extends StatelessWidget {
                                 ],
                               ),
                               ElevatedButton.icon(
-                                onPressed: () {},
+                                onPressed: () => _showCreateNoteDialog(context),
                                 icon: const Icon(Icons.add, size: 18),
                                 label: const Text('New Note'),
                                 style: ElevatedButton.styleFrom(
@@ -116,49 +134,38 @@ class NotesScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      NoteCard(
-                        title: 'Project Alpha Brainstorm',
-                        content:
-                            'Need to outline the main goals for the Q4 sprint and assign tasks to the team. We should also consider the new API integration requirements...',
-                        date: 'Oct 24',
-                        tags: const ['Project', 'Strategy'],
-                        onTap: () {},
+                if (noteProvider.isLoading)
+                  const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (noteProvider.notes.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        'No notes found. Create one!',
+                        style: TextStyle(color: Theme.of(context).hintColor),
                       ),
-                      const SizedBox(height: 16),
-                      NoteCard(
-                        title: 'Grocery List',
-                        content:
-                            'Milk, Eggs, Bread, Avocados, Coffee beans (light roast), Sparkling water, Greek yogurt...',
-                        date: '2h ago',
-                        tags: const ['Personal'],
-                        onTap: () {},
-                      ),
-                      const SizedBox(height: 16),
-                      NoteCard(
-                        title: 'Design Inspiration',
-                        content:
-                            'Check out the minimalist layouts from the latest Dribbble collection. Focus on white space and bold typography.',
-                        date: 'Yesterday',
-                        imageUrl:
-                            'https://lh3.googleusercontent.com/aida-public/AB6AXuDFwho2QLvHQS34GyTba2IlbVsuC1IcgIFtQAL9FaGiV9tXfo_6Xl8NJEPLjIUOEUE5-GKkzCSO_il5m3h5fe_a99xZX095MSLY9Ojen4iDM7Gtk1CbTiEjPIgZym6Vcu9Z0FgZ8cglnsu28NMDGwlkTd1l8cb-JX1d2dEOpTDQSCFbKkIWONOHDXWnJ9NbQJSITJehVr3YrfEoF3179gdbfc_SSRhOcPIurbwDd7YxCRJ3DcChuW2y_SUyo5nBDtT4ZhxYepiAMvVz',
-                        onTap: () {},
-                      ),
-                      const SizedBox(height: 16),
-                      NoteCard(
-                        title: 'Meeting Notes: Client Call',
-                        content:
-                            'Client wants to move the launch date to mid-November. Need to check with the dev team about the current progress on the auth module.',
-                        date: 'Oct 20',
-                        tags: const ['Work', 'Urgent'],
-                        onTap: () {},
-                      ),
-                    ]),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final note = noteProvider.notes[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: NoteCard(
+                            title: note.title,
+                            content: note.content,
+                            date: note.createdAt.toString().substring(5, 10),
+                            onTap: () =>
+                                _showCreateNoteDialog(context, note: note),
+                          ),
+                        );
+                      }, childCount: noteProvider.notes.length),
+                    ),
                   ),
-                ),
               ],
             ),
             Positioned(
@@ -169,6 +176,99 @@ class NotesScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showCreateNoteDialog(BuildContext context, {dynamic note}) {
+    final titleController = TextEditingController(text: note?.title);
+    final contentController = TextEditingController(text: note?.content);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(note == null ? 'Create Note' : 'Edit Note'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            TextField(
+              controller: contentController,
+              decoration: const InputDecoration(labelText: 'Content'),
+              maxLines: 5,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          if (note != null)
+            TextButton(
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Delete Note'),
+                    content: const Text(
+                      'Are you sure you want to delete this note?',
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  context.read<NoteProvider>().deleteNote(note.id);
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ElevatedButton(
+            onPressed: () {
+              if (titleController.text.isNotEmpty) {
+                if (note == null) {
+                  context.read<NoteProvider>().createNote(
+                    titleController.text,
+                    contentController.text,
+                    '#FFFFFF',
+                  );
+                } else {
+                  context.read<NoteProvider>().updateNote(
+                    note.id,
+                    titleController.text,
+                    contentController.text,
+                    '#FFFFFF',
+                  );
+                }
+                Navigator.pop(context);
+              }
+            },
+            child: Text(note == null ? 'Create' : 'Update'),
+          ),
+        ],
       ),
     );
   }

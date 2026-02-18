@@ -1,13 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import '../models/board.dart';
 import '../widgets/dashboard/stat_card.dart';
 import '../widgets/board/board_card.dart';
 import '../widgets/navigation/custom_bottom_nav_bar.dart';
+import '../providers/board_provider.dart';
+import '../providers/task_provider.dart';
 
-class BoardScreen extends StatelessWidget {
+class BoardScreen extends StatefulWidget {
   const BoardScreen({super.key});
 
   @override
+  State<BoardScreen> createState() => _BoardScreenState();
+}
+
+class _BoardScreenState extends State<BoardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BoardProvider>().fetchBoards();
+      context.read<TaskProvider>().fetchTasks();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final boardProvider = context.watch<BoardProvider>();
+    final taskProvider = context.watch<TaskProvider>();
+
     return Scaffold(
       body: SafeArea(
         top: false,
@@ -15,11 +37,11 @@ class BoardScreen extends StatelessWidget {
           children: [
             CustomScrollView(
               slivers: [
-                // Top Custom App Bar
+                // Top Custom App Bar (Same as before but with real user data if available)
                 SliverAppBar(
+                  automaticallyImplyLeading: false,
                   pinned: true,
                   floating: true,
-                  automaticallyImplyLeading: false, // No back button
                   backgroundColor: Theme.of(
                     context,
                   ).scaffoldBackgroundColor.withOpacity(0.8),
@@ -43,15 +65,6 @@ class BoardScreen extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: Theme.of(context).primaryColor,
                                   borderRadius: BorderRadius.circular(8),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Theme.of(
-                                        context,
-                                      ).primaryColor.withOpacity(0.2),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
                                 ),
                                 child: const Icon(
                                   Icons.smart_toy_outlined,
@@ -81,53 +94,6 @@ class BoardScreen extends StatelessWidget {
                               ),
                             ],
                           ),
-                          Row(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Theme.of(
-                                      context,
-                                    ).dividerColor.withOpacity(0.1),
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 10,
-                                    ),
-                                  ],
-                                ),
-                                child: IconButton(
-                                  icon: Icon(
-                                    Icons.search,
-                                    color: Theme.of(context).hintColor,
-                                    size: 20,
-                                  ),
-                                  onPressed: () {},
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Theme.of(context).primaryColor,
-                                    width: 2,
-                                  ),
-                                  image: const DecorationImage(
-                                    image: NetworkImage(
-                                      'https://lh3.googleusercontent.com/aida-public/AB6AXuASfSGXosBs8qUqD_WureXpfX7p-dnOoMPNkL3EmPz4fCBWZGdrBWlmAjgaFo-p4p36OfvuOoe_tcReM0d_C6IeymMYrlcBpvJXJaInSzmxLCwLIcXnrL59pZSmgFtZQQGC751nIabMzhRXcVyoTBXYU_edx3nVdVGYZOpDpq29cw6owyHXVm4nJqEILxbQsnMxq8Q8qedSAVwaREcmWMP1OSUrH1XZTvhAyvPeCdVu_cBN1zFa7xhBZemXXGlwdbN9bH0wUp-RCre7',
-                                    ),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
                         ],
                       ),
                     ),
@@ -142,14 +108,13 @@ class BoardScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-                        // Title
                         Text(
                           'Your Boards',
                           style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          'Wednesday, 04 June 2025',
+                          DateFormat('EEEE, d MMMM y').format(DateTime.now()),
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: Theme.of(context).hintColor),
                         ),
@@ -158,26 +123,31 @@ class BoardScreen extends StatelessWidget {
 
                         // Summary Row
                         Row(
-                          children: const [
+                          children: [
                             Expanded(
                               child: StatCard(
                                 icon: Icons.assignment_outlined,
-                                iconBgColor: Color(0xFFEFF6FF),
+                                iconBgColor: const Color(0xFFEFF6FF),
                                 iconColor: Colors.blue,
-                                value: '1',
+                                value: taskProvider.tasks.length.toString(),
                                 title: 'Total Tasks',
-                                date: '', // No date in HTML board design
+                                date: '',
                               ),
                             ),
-                            SizedBox(width: 16),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: StatCard(
                                 icon: Icons.list_alt_outlined,
-                                iconBgColor: Color(0xFFF1F5F9),
-                                iconColor: Color(
-                                  0xFF64748B,
-                                ), // Slate-500 equivalent
-                                value: '1',
+                                iconBgColor: const Color(0xFFF1F5F9),
+                                iconColor: const Color(0xFF64748B),
+                                value: taskProvider.tasks
+                                    .where(
+                                      (t) =>
+                                          t.status == 'pending' ||
+                                          t.status == 'in-progress',
+                                    )
+                                    .length
+                                    .toString(),
                                 title: 'To Do',
                                 date: '',
                               ),
@@ -197,7 +167,10 @@ class BoardScreen extends StatelessWidget {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                // Show Create Board Dialog
+                                _showCreateBoardDialog(context);
+                              },
                               style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
@@ -221,46 +194,90 @@ class BoardScreen extends StatelessWidget {
                         const SizedBox(height: 24),
 
                         // Boards List
-                        GestureDetector(
-                          onTap: () => Navigator.pushNamed(
-                            context,
-                            '/board-detail',
-                            arguments: 'Project UKK',
-                          ),
-                          child: BoardCard(
-                            title: 'Project UKK',
-                            onEdit: () {},
-                            onDelete: () {},
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        GestureDetector(
-                          onTap: () => Navigator.pushNamed(
-                            context,
-                            '/board-detail',
-                            arguments: 'Project PKL',
-                          ),
-                          child: BoardCard(
-                            title: 'Project PKL',
-                            onEdit: () {},
-                            onDelete: () {},
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        GestureDetector(
-                          onTap: () => Navigator.pushNamed(
-                            context,
-                            '/board-detail',
-                            arguments: 'Cashier App',
-                          ),
-                          child: BoardCard(
-                            title: 'Cashier App',
-                            onEdit: () {},
-                            onDelete: () {},
-                          ),
-                        ),
+                        if (boardProvider.isLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else if (boardProvider.boards.isEmpty)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              child: Text(
+                                'No boards found. Create one!',
+                                style: TextStyle(
+                                  color: Theme.of(context).hintColor,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ...boardProvider.boards
+                              .map(
+                                (board) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.pushNamed(
+                                      context,
+                                      '/board-detail',
+                                      arguments: board,
+                                    ),
+                                    child: BoardCard(
+                                      title: board.name,
+                                      onEdit: () => _showCreateBoardDialog(
+                                        context,
+                                        board: board,
+                                      ),
+                                      onDelete: () async {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text('Delete Board'),
+                                            content: const Text(
+                                              'Are you sure you want to delete this board? All tasks within will be permanently removed.',
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(
+                                                  context,
+                                                  false,
+                                                ),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () => Navigator.pop(
+                                                  context,
+                                                  true,
+                                                ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                  ),
+                                                ),
+                                                child: const Text('Delete'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true) {
+                                          boardProvider.deleteBoard(board.id);
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
 
-                        const SizedBox(height: 120), // Space for bottom nav
+                        const SizedBox(height: 120),
                       ],
                     ),
                   ),
@@ -268,7 +285,6 @@ class BoardScreen extends StatelessWidget {
               ],
             ),
 
-            // Bottom Navigation
             Positioned(
               left: 0,
               right: 0,
@@ -277,6 +293,57 @@ class BoardScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showCreateBoardDialog(BuildContext context, {Board? board}) {
+    final nameController = TextEditingController(text: board?.name);
+    final descController = TextEditingController(text: board?.description);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(board == null ? 'Create Board' : 'Edit Board'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Board Name'),
+            ),
+            TextField(
+              controller: descController,
+              decoration: const InputDecoration(labelText: 'Description'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.isNotEmpty) {
+                if (board == null) {
+                  context.read<BoardProvider>().createBoard(
+                    nameController.text,
+                    descController.text,
+                  );
+                } else {
+                  context.read<BoardProvider>().updateBoard(
+                    board.id,
+                    nameController.text,
+                    descController.text,
+                  );
+                }
+                Navigator.pop(context);
+              }
+            },
+            child: Text(board == null ? 'Create' : 'Update'),
+          ),
+        ],
       ),
     );
   }

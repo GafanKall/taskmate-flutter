@@ -1,14 +1,52 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../widgets/dashboard/stat_card.dart';
 import '../widgets/dashboard/task_card.dart';
 import '../widgets/dashboard/event_card.dart';
 import '../widgets/navigation/custom_bottom_nav_bar.dart';
+import '../providers/auth_provider.dart';
+import '../providers/task_provider.dart';
+import '../providers/event_provider.dart';
+import '../providers/notification_provider.dart';
+import '../widgets/dashboard/notification_modal.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<TaskProvider>().fetchTasks();
+      context.read<EventProvider>().fetchEvents();
+      context.read<NotificationProvider>().fetchNotifications();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final taskProvider = context.watch<TaskProvider>();
+    final eventProvider = context.watch<EventProvider>();
+    final user = authProvider.user;
+
+    final totalTasks = taskProvider.tasks.length;
+    final todoTasks = taskProvider.tasks
+        .where((t) => t.status == 'todo')
+        .length;
+    final inProgressTasks = taskProvider.tasks
+        .where((t) => t.status == 'in_progress')
+        .length;
+    final completedTasks = taskProvider.tasks
+        .where((t) => t.status == 'done')
+        .length;
+
     return Scaffold(
       body: SafeArea(
         top: false,
@@ -16,8 +54,8 @@ class DashboardScreen extends StatelessWidget {
           children: [
             CustomScrollView(
               slivers: [
-                // Top Custom App Bar
                 SliverAppBar(
+                  automaticallyImplyLeading: false,
                   pinned: true,
                   floating: true,
                   backgroundColor: Theme.of(
@@ -83,41 +121,122 @@ class DashboardScreen extends StatelessWidget {
                           ),
                           Row(
                             children: [
+                              Consumer<NotificationProvider>(
+                                builder: (context, provider, _) => Stack(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(
+                                          context,
+                                        ).primaryColor.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: IconButton(
+                                        icon: Icon(
+                                          Icons.notifications_outlined,
+                                          color: Theme.of(context).primaryColor,
+                                        ),
+                                        onPressed: () {
+                                          showModalBottomSheet(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) =>
+                                                const NotificationModal(),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    if (provider.unreadCount > 0)
+                                      Positioned(
+                                        right: 4,
+                                        top: 4,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 16,
+                                            minHeight: 16,
+                                          ),
+                                          child: Text(
+                                            '${provider.unreadCount}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               Container(
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surface,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.errorContainer.withOpacity(0.1),
                                   shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 10,
-                                    ),
-                                  ],
                                 ),
                                 child: IconButton(
                                   icon: Icon(
-                                    Icons.search,
-                                    color: Theme.of(context).hintColor,
+                                    Icons.logout_rounded,
+                                    color: Theme.of(context).colorScheme.error,
                                   ),
-                                  onPressed: () {},
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Theme.of(context).primaryColor,
-                                    width: 2,
-                                  ),
-                                  image: const DecorationImage(
-                                    image: NetworkImage(
-                                      'https://lh3.googleusercontent.com/aida-public/AB6AXuASfSGXosBs8qUqD_WureXpfX7p-dnOoMPNkL3EmPz4fCBWZGdrBWlmAjgaFo-p4p36OfvuOoe_tcReM0d_C6IeymMYrlcBpvJXJaInSzmxLCwLIcXnrL59pZSmgFtZQQGC751nIabMzhRXcVyoTBXYU_edx3nVdVGYZOpDpq29cw6owyHXVm4nJqEILxbQsnMxq8Q8qedSAVwaREcmWMP1OSUrH1XZTvhAyvPeCdVu_cBN1zFa7xhBZemXXGlwdbN9bH0wUp-RCre7',
-                                    ),
-                                    fit: BoxFit.cover,
-                                  ),
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('Confirm Logout'),
+                                        content: const Text(
+                                          'Are you sure you want to log out?',
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, true),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Theme.of(
+                                                context,
+                                              ).colorScheme.error,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            child: const Text('Logout'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      await authProvider.logout();
+                                      if (mounted) {
+                                        Navigator.pushNamedAndRemoveUntil(
+                                          context,
+                                          '/',
+                                          (route) => false,
+                                        );
+                                      }
+                                    }
+                                  },
+                                  tooltip: 'Logout',
                                 ),
                               ),
                             ],
@@ -128,7 +247,6 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   toolbarHeight: 64,
                 ),
-
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -136,11 +254,10 @@ class DashboardScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-                        // Greeting
                         Row(
                           children: [
                             Text(
-                              'Good Evening, Kemal!',
+                              'Hi, ${user?.name ?? 'Guest'}!',
                               style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
@@ -149,63 +266,63 @@ class DashboardScreen extends StatelessWidget {
                           ],
                         ),
                         Text(
-                          'Wednesday, 04 June 2025',
+                          DateFormat('EEEE, d MMMM y').format(DateTime.now()),
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: Theme.of(context).hintColor),
                         ),
-
                         const SizedBox(height: 32),
-
-                        // Stats Horizontal Scroll
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           clipBehavior: Clip.none,
                           child: Row(
-                            children: const [
+                            children: [
                               StatCard(
                                 icon: Icons.assignment_outlined,
-                                iconBgColor: Color(0xFFEFF6FF),
+                                iconBgColor: const Color(0xFFEFF6FF),
                                 iconColor: Colors.blue,
-                                value: '1',
+                                value: totalTasks.toString(),
                                 title: 'Total Tasks',
-                                date: 'Jun 2025',
+                                date: DateFormat(
+                                  'MMM y',
+                                ).format(DateTime.now()),
                               ),
-                              SizedBox(width: 16),
+                              const SizedBox(width: 16),
                               StatCard(
                                 icon: Icons.list_alt_outlined,
-                                iconBgColor: Color(0xFFF8FAFC),
-                                iconColor: Color(
-                                  0xFF64748B,
-                                ), // Slate-500 equivalent
-                                value: '1',
+                                iconBgColor: const Color(0xFFF8FAFC),
+                                iconColor: const Color(0xFF64748B),
+                                value: todoTasks.toString(),
                                 title: 'To Do',
-                                date: 'Jun 2025',
+                                date: DateFormat(
+                                  'MMM y',
+                                ).format(DateTime.now()),
                               ),
-                              SizedBox(width: 16),
+                              const SizedBox(width: 16),
                               StatCard(
                                 icon: Icons.pending_outlined,
-                                iconBgColor: Color(0xFFFFFBEB),
+                                iconBgColor: const Color(0xFFFFFBEB),
                                 iconColor: Colors.amber,
-                                value: '0',
+                                value: inProgressTasks.toString(),
                                 title: 'In Progress',
-                                date: 'Jun 2025',
+                                date: DateFormat(
+                                  'MMM y',
+                                ).format(DateTime.now()),
                               ),
-                              SizedBox(width: 16),
+                              const SizedBox(width: 16),
                               StatCard(
                                 icon: Icons.check_circle_outlined,
-                                iconBgColor: Color(0xFFECFDF5),
-                                iconColor: Color(0xFF10B981), // Emerald-500
-                                value: '0',
+                                iconBgColor: const Color(0xFFECFDF5),
+                                iconColor: const Color(0xFF10B981),
+                                value: completedTasks.toString(),
                                 title: 'Completed',
-                                date: 'Jun 2025',
+                                date: DateFormat(
+                                  'MMM y',
+                                ).format(DateTime.now()),
                               ),
                             ],
                           ),
                         ),
-
                         const SizedBox(height: 40),
-
-                        // Upcoming Tasks Section
                         _buildSectionHeader(
                           context,
                           'Upcoming Tasks',
@@ -213,16 +330,33 @@ class DashboardScreen extends StatelessWidget {
                           'View All →',
                         ),
                         const SizedBox(height: 16),
-                        const TaskCard(
-                          title: 'Tugas DFD',
-                          dueDate: 'Jun 07',
-                          status: 'Todo',
-                          accentColor: Color(0xFFF43F5E), // Rose-500
-                        ),
-
+                        if (taskProvider.isLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else if (taskProvider.tasks.isEmpty)
+                          const Text('No upcoming tasks')
+                        else
+                          ...taskProvider.tasks
+                              .take(3)
+                              .map(
+                                (task) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: TaskCard(
+                                    title: task.title,
+                                    dueDate:
+                                        task.endDate?.toString().substring(
+                                          5,
+                                          10,
+                                        ) ??
+                                        'No date',
+                                    status: (task.status ?? 'todo')
+                                        .toUpperCase(),
+                                    accentColor: _getStatusColor(
+                                      task.status ?? 'todo',
+                                    ),
+                                  ),
+                                ),
+                              ),
                         const SizedBox(height: 40),
-
-                        // Today's Events Section
                         _buildSectionHeader(
                           context,
                           'Today\'s Events',
@@ -230,42 +364,35 @@ class DashboardScreen extends StatelessWidget {
                           'Event →',
                         ),
                         const SizedBox(height: 16),
-                        const EventCard(
-                          isToday: true,
-                          title: 'UI/UX Design Project',
-                          accentColor: Color(0xFFF43F5E), // Rose-500
-                          time: 'All Day',
-                          category: 'Work',
-                          categoryIcon: Icons.work_outline,
-                        ),
-
-                        const SizedBox(height: 40),
-
-                        // Upcoming Events Section
-                        _buildSectionHeader(
-                          context,
-                          'Upcoming Events',
-                          Icons.notifications_active,
-                          null,
-                        ),
-                        const SizedBox(height: 16),
-                        const EventCard(
-                          title: 'Summer Holiday',
-                          accentColor: Colors.amber,
-                          month: 'Jun',
-                          day: '05',
-                          description: 'Annual vacation break',
-                        ),
-
-                        const SizedBox(height: 100), // Space for bottom nav
+                        if (eventProvider.isLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else if (eventProvider.events.isEmpty)
+                          const Text('No events today')
+                        else
+                          ...eventProvider.events
+                              .take(2)
+                              .map(
+                                (event) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: EventCard(
+                                    isToday: true,
+                                    title: event.title,
+                                    accentColor: Theme.of(context).primaryColor,
+                                    time: event.allDay
+                                        ? 'All Day'
+                                        : 'Scheduled',
+                                    category: event.category ?? 'General',
+                                    categoryIcon: Icons.event,
+                                  ),
+                                ),
+                              ),
+                        const SizedBox(height: 100),
                       ],
                     ),
                   ),
                 ),
               ],
             ),
-
-            // Bottom Navigation
             Positioned(
               left: 0,
               right: 0,
@@ -276,6 +403,19 @@ class DashboardScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'todo':
+        return Colors.blue;
+      case 'in_progress':
+        return Colors.amber;
+      case 'done':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 
   Widget _buildSectionHeader(

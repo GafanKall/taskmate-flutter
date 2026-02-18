@@ -1,11 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../widgets/navigation/custom_bottom_nav_bar.dart';
+import '../providers/event_provider.dart';
+import '../providers/weekly_schedule_provider.dart';
 
-class ScheduleScreen extends StatelessWidget {
+class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
 
   @override
+  State<ScheduleScreen> createState() => _ScheduleScreenState();
+}
+
+class _ScheduleScreenState extends State<ScheduleScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<EventProvider>().fetchEvents();
+      context.read<WeeklyScheduleProvider>().fetchSchedules();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final eventProvider = context.watch<EventProvider>();
+    final scheduleProvider = context.watch<WeeklyScheduleProvider>();
+
     return Scaffold(
       body: SafeArea(
         top: false,
@@ -14,6 +35,7 @@ class ScheduleScreen extends StatelessWidget {
             CustomScrollView(
               slivers: [
                 SliverAppBar(
+                  automaticallyImplyLeading: false,
                   pinned: true,
                   floating: true,
                   backgroundColor: Theme.of(
@@ -35,7 +57,7 @@ class ScheduleScreen extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Weekly Schedule',
+                                'Your Schedule',
                                 style: Theme.of(context).textTheme.headlineSmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.bold,
@@ -58,7 +80,7 @@ class ScheduleScreen extends StatelessWidget {
                             ],
                           ),
                           Text(
-                            'Today, Wednesday, 04 June 2025',
+                            DateFormat('EEEE, d MMMM y').format(DateTime.now()),
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Theme.of(context).hintColor),
                           ),
@@ -67,49 +89,106 @@ class ScheduleScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      _buildDaySection(
-                        context,
-                        'Monday',
-                        'Jun 02',
-                        activities: [
-                          _buildActivityCard(
-                            context,
-                            'Sleep',
-                            '22:00',
-                            '05:00',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      _buildDaySection(
-                        context,
-                        'Tuesday',
-                        'Jun 03',
-                        isEmpty: true,
-                      ),
-                      const SizedBox(height: 24),
-                      _buildDaySection(
-                        context,
-                        'Wednesday',
-                        'Jun 04',
-                        isToday: true,
-                        isEmpty: true,
-                      ),
-                      const SizedBox(height: 24),
-                      _buildDaySection(
-                        context,
-                        'Thursday',
-                        'Jun 05',
-                        isEmpty: true,
-                      ),
-                      const SizedBox(height: 120), // Bottom padding for navbar
-                    ]),
+                if (eventProvider.isLoading || scheduleProvider.isLoading)
+                  const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        // Group by day of week for weekly schedule
+                        ...[
+                          'Monday',
+                          'Tuesday',
+                          'Wednesday',
+                          'Thursday',
+                          'Friday',
+                          'Saturday',
+                          'Sunday',
+                        ].map((day) {
+                          final daySchedules = scheduleProvider.schedules
+                              .where(
+                                (s) =>
+                                    s.dayOfWeek.toLowerCase() ==
+                                    day.toLowerCase(),
+                              )
+                              .toList();
+                          final isToday =
+                              DateFormat('EEEE').format(DateTime.now()) == day;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            child: _buildDaySection(
+                              context,
+                              day,
+                              '', // Could add date if we wanted to match events
+                              isToday: isToday,
+                              isEmpty: daySchedules.isEmpty,
+                              activities: daySchedules
+                                  .map(
+                                    (s) => _buildActivityCard(
+                                      context,
+                                      s.title,
+                                      s.startTime,
+                                      s.endTime,
+                                      onDelete: () async {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text(
+                                              'Delete Schedule',
+                                            ),
+                                            content: const Text(
+                                              'Are you sure you want to delete this activity?',
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(
+                                                  context,
+                                                  false,
+                                                ),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () => Navigator.pop(
+                                                  context,
+                                                  true,
+                                                ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.red,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                  ),
+                                                ),
+                                                child: const Text('Delete'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true) {
+                                          scheduleProvider.deleteSchedule(s.id);
+                                        }
+                                      },
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          );
+                        }).toList(),
+                        const SizedBox(height: 120),
+                      ]),
+                    ),
                   ),
-                ),
               ],
             ),
             Positioned(
@@ -122,7 +201,7 @@ class ScheduleScreen extends StatelessWidget {
               bottom: 100,
               right: 24,
               child: FloatingActionButton(
-                onPressed: () {},
+                onPressed: () => _showAddScheduleDialog(context),
                 backgroundColor: Theme.of(context).primaryColor,
                 child: const Icon(Icons.add, color: Colors.white, size: 32),
               ),
@@ -151,20 +230,15 @@ class ScheduleScreen extends StatelessWidget {
               : Theme.of(context).dividerColor.withOpacity(0.05),
           width: isToday ? 2 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
+              color: isToday
+                  ? Theme.of(context).primaryColor
+                  : Theme.of(context).dividerColor.withOpacity(0.1),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(23),
                 topRight: Radius.circular(23),
@@ -173,57 +247,35 @@ class ScheduleScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      day,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    if (isToday) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'TODAY',
-                          style: TextStyle(
-                            color: Theme.of(context).primaryColor,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                Text(
+                  day,
+                  style: TextStyle(
+                    color: isToday
+                        ? Colors.white
+                        : Theme.of(context).textTheme.bodyLarge?.color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    date,
-                    style: const TextStyle(
+                if (isToday)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
                       color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'TODAY',
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -233,63 +285,14 @@ class ScheduleScreen extends StatelessWidget {
               children: [
                 if (isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.event_busy,
-                          size: 40,
-                          color: Theme.of(context).hintColor.withOpacity(0.4),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No scheduled activities',
-                          style: TextStyle(
-                            color: Theme.of(context).hintColor.withOpacity(0.6),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'No activities',
+                      style: TextStyle(color: Theme.of(context).hintColor),
                     ),
                   )
                 else
                   ...activities,
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () {},
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Theme.of(context).dividerColor.withOpacity(0.1),
-                        width: 2,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add_rounded,
-                          size: 20,
-                          color: Theme.of(context).hintColor,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Add activity',
-                          style: TextStyle(
-                            color: Theme.of(context).hintColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -302,17 +305,15 @@ class ScheduleScreen extends StatelessWidget {
     BuildContext context,
     String title,
     String startTime,
-    String endTime,
-  ) {
+    String endTime, {
+    required VoidCallback onDelete,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.5),
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).dividerColor.withOpacity(0.05),
-        ),
       ),
       child: Column(
         children: [
@@ -327,14 +328,12 @@ class ScheduleScreen extends StatelessWidget {
                 ),
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: onDelete,
                 icon: const Icon(
                   Icons.delete_outline,
                   color: Colors.red,
                   size: 20,
                 ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
               ),
             ],
           ),
@@ -343,11 +342,7 @@ class ScheduleScreen extends StatelessWidget {
             children: [
               _buildTimeBadge(context, startTime),
               const SizedBox(width: 8),
-              Icon(
-                Icons.arrow_forward,
-                size: 16,
-                color: Theme.of(context).hintColor.withOpacity(0.3),
-              ),
+              const Icon(Icons.arrow_forward, size: 16, color: Colors.grey),
               const SizedBox(width: 8),
               _buildTimeBadge(context, endTime),
             ],
@@ -363,21 +358,102 @@ class ScheduleScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Theme.of(context).dividerColor.withOpacity(0.1),
-        ),
       ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.schedule,
-            size: 14,
-            color: Theme.of(context).hintColor.withOpacity(0.5),
+      child: Text(
+        time,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  void _showAddScheduleDialog(BuildContext context) {
+    final activityController = TextEditingController();
+    final startTimeController = TextEditingController(text: '08:00');
+    final endTimeController = TextEditingController(text: '09:00');
+    String selectedDay = 'Monday';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Activity'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: activityController,
+              decoration: const InputDecoration(labelText: 'Activity'),
+            ),
+            DropdownButtonFormField<String>(
+              value: selectedDay,
+              items:
+                  [
+                        'Monday',
+                        'Tuesday',
+                        'Wednesday',
+                        'Thursday',
+                        'Friday',
+                        'Saturday',
+                        'Sunday',
+                      ]
+                      .map(
+                        (day) => DropdownMenuItem(value: day, child: Text(day)),
+                      )
+                      .toList(),
+              onChanged: (val) => selectedDay = val!,
+              decoration: const InputDecoration(labelText: 'Day'),
+            ),
+            TextField(
+              controller: startTimeController,
+              decoration: const InputDecoration(
+                labelText: 'Start Time (HH:mm)',
+              ),
+            ),
+            TextField(
+              controller: endTimeController,
+              decoration: const InputDecoration(labelText: 'End Time (HH:mm)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
-          const SizedBox(width: 6),
-          Text(
-            time,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ElevatedButton(
+            onPressed: () {
+              if (activityController.text.isNotEmpty) {
+                final provider = context.read<WeeklyScheduleProvider>();
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
+
+                provider
+                    .createSchedule({
+                      'title': activityController.text,
+                      'day_of_week': selectedDay.toLowerCase(),
+                      'start_time': startTimeController.text,
+                      'end_time': endTimeController.text,
+                    })
+                    .then((_) {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Schedule added successfully'),
+                        ),
+                      );
+                      navigator.pop();
+                    })
+                    .catchError((e) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Failed to add schedule: ${e.toString()}',
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    });
+              }
+            },
+            child: const Text('Add'),
           ),
         ],
       ),

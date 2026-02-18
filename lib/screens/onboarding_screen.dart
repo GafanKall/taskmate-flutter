@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'sign_up_screen.dart';
 import 'sign_in_screen.dart';
 import '../main.dart'; // For themeNotifier
 
@@ -177,7 +178,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         width: double.infinity,
                         height: 64,
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SignUpScreen(),
+                              ),
+                            );
+                          },
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [

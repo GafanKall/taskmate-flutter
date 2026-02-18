@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../widgets/shared/custom_text_field.dart';
 import '../widgets/shared/gradient_background.dart';
-import 'sign_up_screen.dart';
-import 'dashboard_screen.dart';
+import '../providers/auth_provider.dart';
 import '../main.dart'; // For themeNotifier
 
 class SignInScreen extends StatefulWidget {
@@ -14,7 +14,30 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isObscured = true;
+
+  void _login() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        await context.read<AuthProvider>().login(
+          _emailController.text,
+          _passwordController.text,
+        );
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Login failed: ${e.toString()}')),
+          );
+        }
+      }
+    }
+  }
 
   void _toggleTheme() {
     themeNotifier.value = themeNotifier.value == ThemeMode.light
@@ -24,6 +47,8 @@ class _SignInScreenState extends State<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+
     return Scaffold(
       body: Stack(
         children: [
@@ -110,165 +135,170 @@ class _SignInScreenState extends State<SignInScreen> {
                   ),
                 ],
               ),
-              child: Column(
-                children: [
-                  Column(
-                    children: [
-                      Text(
-                        'Welcome Back!',
-                        style: Theme.of(context).textTheme.displayMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Login to TaskMate and keep your productivity on track.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    Column(
+                      children: [
+                        Text(
+                          'Welcome Back!',
+                          style: Theme.of(context).textTheme.displayMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Login to TaskMate and keep your productivity on track.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
 
-                  const SizedBox(height: 32),
+                    const SizedBox(height: 32),
 
-                  // Text Fields
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CustomTextField(
-                            label: 'Email Address',
-                            hint: 'name@example.com',
-                            icon: Icons.mail_outlined,
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Password',
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              TextButton(
-                                onPressed: () {},
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: Size.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: Text(
-                                  'Forgot Password?',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).primaryColor,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            obscureText: _isObscured,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                            decoration: InputDecoration(
-                              hintText: '••••••••',
-                              prefixIcon: Icon(
-                                Icons.lock_outlined,
-                                color: Theme.of(context).hintColor,
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isObscured
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: Theme.of(context).hintColor,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isObscured = !_isObscured;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const DashboardScreen(),
-                                  ),
-                                );
+                    // Text Fields
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CustomTextField(
+                              label: 'Email Address',
+                              hint: 'name@example.com',
+                              icon: Icons.mail_outlined,
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your email';
+                                }
+                                if (!value.contains('@')) {
+                                  return 'Please enter a valid email';
+                                }
+                                return null;
                               },
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'Sign In',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.login_outlined),
-                                ],
-                              ),
                             ),
-                          ),
 
-                          const SizedBox(height: 24),
+                            const SizedBox(height: 24),
 
-                          Center(
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const SignUpScreen(),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Password',
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                TextButton(
+                                  onPressed: () {},
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
-                                );
-                              },
-                              child: RichText(
-                                text: TextSpan(
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                  children: [
-                                    const TextSpan(
-                                      text: "Don't have an account? ",
+                                  child: Text(
+                                    'Forgot Password?',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).primaryColor,
                                     ),
-                                    TextSpan(
-                                      text: 'Sign Up',
-                                      style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            CustomTextField(
+                              label: '', // Label already handled above
+                              hint: '••••••••',
+                              icon: Icons.lock_outlined,
+                              isPassword: true,
+                              isObscured: _isObscured,
+                              controller: _passwordController,
+                              onToggleVisibility: () {
+                                setState(() {
+                                  _isObscured = !_isObscured;
+                                });
+                              },
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your password';
+                                }
+                                return null;
+                              },
+                            ),
+
+                            const SizedBox(height: 32),
+
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: authProvider.isLoading
+                                    ? null
+                                    : _login,
+                                child: authProvider.isLoading
+                                    ? const CircularProgressIndicator(
+                                        color: Colors.white,
+                                      )
+                                    : Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Sign In',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Icon(Icons.login_outlined),
+                                        ],
                                       ),
-                                    ),
-                                  ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            Center(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.pushNamed(context, '/sign-up');
+                                },
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                    children: [
+                                      const TextSpan(
+                                        text: "Don't have an account? ",
+                                      ),
+                                      TextSpan(
+                                        text: 'Sign Up',
+                                        style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).primaryColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
 
-                          const SizedBox(height: 32),
-                        ],
+                            const SizedBox(height: 32),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
